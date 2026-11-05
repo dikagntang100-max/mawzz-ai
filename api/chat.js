@@ -1,127 +1,98 @@
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "5mb"
-    }
-  }
+      sizeLimit: "5mb",
+    },
+  },
 };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
-      error: "Method not allowed"
+      error: "Method tidak diizinkan",
     });
   }
 
   try {
-    if (!process.env.GROQ_API_KEY) {
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
       return res.status(500).json({
-        error: "API Key Groq belum dipasang."
+        error: "GROQ_API_KEY belum dipasang di Vercel",
       });
     }
 
-    const {
-      message,
-      image,
-      fileText,
-      fileName
-    } = req.body || {};
-
-    if (!message && !image && !fileText) {
-      return res.status(400).json({
-        error: "Pesan atau lampiran kosong."
-      });
-    }
-
-    if (
-      image &&
-      !/^data:image\/(jpeg|png|webp);base64,/.test(image)
-    ) {
-      return res.status(400).json({
-        error: "Format foto tidak didukung."
-      });
-    }
+    const { message, image, fileText, fileName } = req.body || {};
 
     const systemPrompt = `
-Kamu adalah MAWZZ AI, asisten kecerdasan buatan yang ramah,
-pintar, sopan, dan informatif.
+Kamu adalah MAWZZ AI, asisten AI yang ramah,
+cerdas, informatif, dan menjawab menggunakan bahasa
+yang digunakan pengguna.
 
-IDENTITAS:
-Nama: MAWZZ AI
-Pembuat: Budi Gang Maimun Sei Baru.
+Jika ditanya siapa pembuatmu, jawab:
+"Saya dibuat oleh Budi Gang Maimun Sei Baru."
 
-Jika pengguna bertanya:
-"Siapa yang membuatmu?"
-"Siapa pembuatmu?"
-"Siapa penciptamu?"
-
-Jawab:
-"Halo! Saya MAWZZ AI, asisten AI yang dibuat oleh Budi Gang Maimun Sei Baru. Saya siap membantu menjawab pertanyaan dan memberikan informasi kepada kamu!"
-
-ATURAN:
-1. Gunakan bahasa sesuai bahasa pengguna.
-2. Jawab dengan jelas dan mudah dipahami.
-3. Bantu menjawab pertanyaan umum, teknologi, pendidikan,
-   dan informasi lainnya.
-4. Jangan mengarang fakta.
-5. Jika tidak mengetahui sesuatu, katakan dengan jujur.
-6. Jika pengguna mengirim foto, jelaskan isi foto berdasarkan
-   hal yang benar-benar terlihat.
-7. Jika pengguna mengirim dokumen teks, bantu membaca,
-   menjelaskan, dan merangkumnya.
-8. Jangan mengaku mengetahui informasi terbaru jika belum
-   memiliki sumber yang memverifikasinya.
+Jawab pertanyaan dengan jelas dan jujur.
+Jangan mengarang fakta. Jika tidak tahu, katakan
+bahwa kamu belum mengetahui jawabannya.
 `;
 
-    const prompt = [
-      message || "Tolong jelaskan lampiran ini.",
-      fileText
-        ? `\n\nIsi file ${fileName || ""}:\n${fileText.slice(0, 30000)}`
-        : ""
-    ].join("");
+    const userContent = [];
 
-    const model = image
-      ? "qwen/qwen3.8-27b"
-      : "openai/gpt-oss-20b";
+    if (message) {
+      userContent.push({
+        type: "text",
+        text: message,
+      });
+    }
 
-    const content = image
-      ? [
-          {
-            type: "text",
-            text: prompt
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: image
-            }
-          }
-        ]
-      : prompt;
+    if (fileText) {
+      userContent.push({
+        type: "text",
+        text: `Isi file ${fileName || "lampiran"}:\n${fileText}`,
+      });
+    }
+
+    if (image) {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: image,
+        },
+      });
+    }
+
+    if (userContent.length === 0) {
+      return res.status(400).json({
+        error: "Pesan atau lampiran masih kosong",
+      });
+    }
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
       {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
         },
         body: JSON.stringify({
-          model,
+          model: image
+            ? "meta-llama/llama-4-scout-17b-16e-instruct"
+            : "openai/gpt-oss-20b",
           messages: [
             {
               role: "system",
-              content: systemPrompt
+              content: systemPrompt,
             },
             {
               role: "user",
-              content
-            }
+              content: userContent,
+            },
           ],
           temperature: 0.7,
-          max_completion_tokens: 2048
-        })
+          max_tokens: 2048,
+        }),
       }
     );
 
@@ -129,21 +100,17 @@ ATURAN:
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error:
-          data.error?.message ||
-          "Groq API mengalami masalah."
+        error: data.error?.message || "Gagal menghubungi Groq",
       });
     }
 
     return res.status(200).json({
-      reply:
-        data.choices?.[0]?.message?.content ||
-        "Maaf, belum ada jawaban."
+      reply: data.choices?.[0]?.message?.content ||
+        "Maaf, belum ada jawaban.",
     });
-
   } catch (error) {
     return res.status(500).json({
-      error: "Terjadi kesalahan pada server."
+      error: "Terjadi kesalahan pada server",
     });
   }
 }
