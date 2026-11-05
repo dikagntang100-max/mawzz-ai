@@ -2,56 +2,49 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAWZZ AI</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#080d18;color:white;font-family:Arial,sans-serif}
-header{height:65px;padding:15px 18px;background:#101a2d;border-bottom:1px solid #263752;display:flex;align-items:center;gap:12px}
-.logo{background:#1677ff;padding:10px;border-radius:12px;font-weight:bold}
-header h2{font-size:18px;margin:0}
-header small{color:#8ca8cc}
-#chat{height:calc(100dvh - 145px);overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
-.msg{max-width:88%;padding:13px 15px;border-radius:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
-.user{align-self:flex-end;background:#1769dc}
-.ai{align-self:flex-start;background:#17243a}
-.ai img,.user img{max-width:100%;max-height:220px;border-radius:10px;display:block;margin-top:8px}
-.file-label{font-size:12px;color:#c5d7f2;margin-top:8px}
-footer{position:fixed;bottom:0;width:100%;background:#101a2d;padding:12px;border-top:1px solid #263752}
-#preview{font-size:12px;color:#a9c8ed;margin:0 5px 8px}
-.controls{display:flex;gap:8px;align-items:center}
-input[type=text]{flex:1;min-width:0;background:#1a2940;border:1px solid #344b6d;border-radius:12px;padding:13px;color:white;outline:none}
-button,.attach{border:0;border-radius:12px;padding:12px;background:#1769dc;color:white;font-weight:bold;cursor:pointer}
-.attach{background:#253956;font-size:19px}
+header{padding:18px;background:#101a2d;border-bottom:1px solid #263653}
+header h2{margin:0;color:#55aaff}
+header p{margin:5px 0 0;color:#9eacc2;font-size:13px}
+#chat{height:calc(100dvh - 170px);overflow-y:auto;padding:15px}
+.msg{padding:13px;margin:12px 0;border-radius:13px;max-width:90%;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}
+.user{background:#174c83;margin-left:auto}
+.ai{background:#172338;border:1px solid #293c5b}
+.copy{display:inline-block;margin-top:10px;padding:7px 12px;border:0;border-radius:7px;background:#2878cf;color:white}
+#preview{padding:0 15px;color:#9eacc2;font-size:13px}
+footer{position:fixed;bottom:0;width:100%;padding:12px;background:#101a2d;border-top:1px solid #263653}
+.controls{display:flex;gap:8px}
+input[type=text]{min-width:0;flex:1;padding:13px;border:1px solid #344762;border-radius:10px;background:#080d18;color:white;outline:none}
+button{border:0;border-radius:10px;padding:12px;background:#2784e8;color:white;font-weight:bold}
+.file{display:inline-block;padding:10px;color:#7dbbff}
+#file{display:none}
 button:disabled{opacity:.5}
-#status{font-size:12px;color:#8daed8;padding:5px}
 </style>
 </head>
 <body>
+
 <header>
- <div class="logo">M</div>
- <div>
-  <h2>MAWZZ AI</h2>
-  <small>AI Assistant • Groq</small>
- </div>
+<h2>MAWZZ AI</h2>
+<p>Asisten AI pintar untuk menjawab pertanyaanmu</p>
 </header>
 
-<main id="chat">
- <div class="msg ai">Halo! Saya MAWZZ AI. 👋
-Kamu bisa bertanya, mengirim foto, atau mengirim dokumen untuk saya bantu baca.</div>
-</main>
+<div id="chat">
+<div class="msg ai">Halo! Saya MAWZZ AI. Ada yang bisa saya bantu?</div>
+</div>
+
+<div id="preview"></div>
 
 <footer>
- <div id="preview"></div>
- <div class="controls">
-  <label class="attach" title="Pilih foto atau dokumen">
-   📎
-   <input id="file" type="file" accept="image/jpeg,image/png,image/webp,.txt,.pdf,.docx" hidden>
-  </label>
-  <input id="message" type="text" placeholder="Tanyakan sesuatu...">
-  <button id="send">Kirim</button>
- </div>
- <div id="status"></div>
+<div class="controls">
+<label class="file" for="file">＋ File</label>
+<input id="file" type="file" accept="image/jpeg,image/png,image/webp,.txt">
+<input id="message" type="text" placeholder="Tulis pertanyaan..." onkeydown="if(event.key==='Enter')send()">
+<button id="sendBtn" onclick="send()">Kirim</button>
+</div>
 </footer>
 
 <script>
@@ -59,132 +52,97 @@ const chat=document.getElementById("chat");
 const input=document.getElementById("message");
 const fileInput=document.getElementById("file");
 const preview=document.getElementById("preview");
-const statusText=document.getElementById("status");
-const sendBtn=document.getElementById("send");
+const sendBtn=document.getElementById("sendBtn");
 
-let attachment=null;
+let selectedFile=null;
 
-function addMessage(text,type,imageUrl=null,fileName=null){
- const div=document.createElement("div");
- div.className="msg "+type;
- const content=document.createElement("div");
- content.textContent=text;
- div.appendChild(content);
-
- if(imageUrl){
-  const img=document.createElement("img");
-  img.src=imageUrl;
-  div.appendChild(img);
- }
- if(fileName){
-  const label=document.createElement("div");
-  label.className="file-label";
-  label.textContent="📎 "+fileName;
-  div.appendChild(label);
- }
- chat.appendChild(div);
- chat.scrollTop=chat.scrollHeight;
-}
-
-fileInput.addEventListener("change",async()=>{
- const file=fileInput.files[0];
- if(!file)return;
-
- const allowed=["image/jpeg","image/png","image/webp","text/plain","application/pdf","application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-
- if(!allowed.includes(file.type)){
-  alert("Format file belum didukung.");
-  fileInput.value="";
-  return;
- }
-
- if(file.size>3*1024*1024){
-  alert("Ukuran maksimal file 3 MB.");
-  fileInput.value="";
-  return;
- }
-
- attachment=null;
-
- try{
-  if(file.type.startsWith("image/")){
-   const data=await readDataURL(file);
-   attachment={image:data};
-  }else if(file.type==="text/plain"){
-   attachment={fileText:await file.text()};
-  }else{
-   attachment={unsupported:true};
-  }
-
-  attachment.name=file.name;
-  attachment.type=file.type;
-  preview.textContent="📎 "+file.name+
-   (attachment.unsupported?" — PDF/DOCX perlu fitur ekstraksi dokumen di backend.":" — siap dikirim");
- }catch(e){
-  alert("Gagal membaca file.");
- }
+fileInput.addEventListener("change",()=>{
+selectedFile=fileInput.files[0]||null;
+preview.textContent=selectedFile?"Lampiran: "+selectedFile.name:"";
 });
 
-function readDataURL(file){
- return new Promise((resolve,reject)=>{
-  const reader=new FileReader();
-  reader.onload=()=>resolve(reader.result);
-  reader.onerror=reject;
-  reader.readAsDataURL(file);
- });
+function addMessage(text,type){
+const div=document.createElement("div");
+div.className="msg "+type;
+div.textContent=text;
+chat.appendChild(div);
+chat.scrollTop=chat.scrollHeight;
+return div;
 }
 
-async function sendMessage(){
- const message=input.value.trim();
- if(!message&&!attachment)return;
-
- if(attachment?.unsupported){
-  alert("Pembacaan PDF dan DOCX belum diaktifkan. Foto dan TXT sudah didukung.");
-  return;
- }
-
- const current=attachment;
- const image=current?.image||null;
- const fileName=current?.name||null;
- const fileText=current?.fileText||null;
-
- addMessage(message||"Tolong jelaskan lampiran ini.", "user",image,fileName);
-
- input.value="";
- fileInput.value="";
- attachment=null;
- preview.textContent="";
- sendBtn.disabled=true;
- statusText.textContent="MAWZZ AI sedang berpikir...";
-
- try{
-  const response=await fetch("/api/chat",{
-   method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({
-    message,
-    image,
-    fileText,
-    fileName
-   })
-  });
-
-  const data=await response.json();
-  if(!response.ok)throw new Error(data.error||"Terjadi kesalahan");
-
-  addMessage(data.reply||"Tidak ada jawaban.","ai");
- }catch(error){
-  addMessage("Maaf, terjadi kesalahan: "+error.message,"ai");
- }finally{
-  sendBtn.disabled=false;
-  statusText.textContent="";
- }
+function addCopyButton(container,text){
+const btn=document.createElement("button");
+btn.className="copy";
+btn.textContent="Salin jawaban";
+btn.onclick=async()=>{
+try{
+await navigator.clipboard.writeText(text);
+btn.textContent="Tersalin!";
+setTimeout(()=>btn.textContent="Salin jawaban",1500);
+}catch(e){
+btn.textContent="Gagal menyalin";
+}
+};
+container.appendChild(btn);
 }
 
-sendBtn.addEventListener("click",sendMessage);
-input.addEventListener("keydown",e=>{
- if(e.key==="Enter")sendMessage();
+async function send(){
+const message=input.value.trim();
+if(!message&&!selectedFile)return;
+
+addMessage(message||"Tolong periksa lampiran ini.","user");
+input.value="";
+sendBtn.disabled=true;
+const loading=addMessage("MAWZZ AI sedang berpikir...","ai");
+
+try{
+let image=null;
+let fileText=null;
+let fileName=null;
+
+if(selectedFile){
+fileName=selectedFile.name;
+
+if(selectedFile.size>3*1024*1024){
+throw new Error("Ukuran file maksimal 3 MB.");
+}
+
+if(selectedFile.type.startsWith("image/")){
+image=await new Promise((resolve,reject)=>{
+const reader=new FileReader();
+reader.onload=()=>resolve(reader.result);
+reader.onerror=reject;
+reader.readAsDataURL(selectedFile);
 });
+}else if(selectedFile.type==="text/plain"){
+fileText=await selectedFile.text();
+}else{
+throw new Error("Format yang didukung: JPG, PNG, WEBP, dan TXT.");
+}
+}
+
+const response=await fetch("/api/chat",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({message,image,fileText,fileName})
+});
+
+const data=await response.json();
+if(!response.ok)throw new Error(data.error||"Terjadi kesalahan.");
+
+loading.textContent=data.reply||"Tidak ada jawaban.";
+addCopyButton(loading,data.reply||"");
+}catch(error){
+loading.textContent="Error: "+error.message;
+}
+
+selectedFile=null;
+fileInput.value="";
+preview.textContent="";
+sendBtn.disabled=false;
+chat.scrollTop=chat.scrollHeight;
+}
 </script>
+
 </body>
 </html>
